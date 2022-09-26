@@ -92,7 +92,7 @@ endfunction
 
 
 " main function - do a fuzzy search
-function FuzzySearch(flags, pattern, cur_file_only)
+function FuzzySearchMenu(flags, pattern, cur_file_only)
   " settings
   let l:grep_cmd = get(g:, 'grep_cmd', 'grep')
   let l:grep_exclude_files = get(g:, 'grep_exclude_files', '')
@@ -164,6 +164,15 @@ function FuzzyBack()
 
   let l:prev_loc = remove(s:prev_locations, -1)
   execute 'edit +' . l:prev_loc[0] l:prev_loc[1]
+endfunction
+
+
+" regular (non-interactive) fuzzy search
+function FuzzySearch(pattern)
+  let l:chars = split(a:pattern, '\zs')
+  let l:regex = join(l:chars, ".*")
+  let l:cmd = "/\\c" . l:regex . "\<CR>"
+  call feedkeys(l:cmd)
 endfunction
 
 
