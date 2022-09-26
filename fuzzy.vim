@@ -1,0 +1,171 @@
+" Vim global plugin for fuzzy search
+" Last Change:  2022 Sep 27
+" Maintainer:   Eran Friedman
+" License:      This file is placed in the public domain.
+
+
+if exists("g:loaded_fuzzy")
+  finish
+endif
+let g:loaded_fuzzy= 1
+
+
+let s:save_cpo = &cpo
+set cpo&vim
+
+
+let s:prev_locations = []
+
+
+function s:CloseBuffer(bufnr)
+   wincmd p
+   execute "bwipe" a:bufnr
+   redraw
+   return ""
+endfunction
+
+
+function s:InteractiveMenu(input, prompt, pattern) abort
+  bo new +setlocal\ buftype=nofile\ bufhidden=wipe\ nofoldenable\
+    \ colorcolumn=0\ nobuflisted\ number\ norelativenumber\ noswapfile\ nowrap\ cursorline
+
+  " settings
+  let l:fuzzy_menu_height = get(g:, 'fuzzy_menu_height', 15)
+  let l:fuzzy_file_color = get(g:, 'fuzzy_file_color', "blue")
+  let l:fuzzy_pattern_color = get(g:, 'fuzzy_pattern_color', "red")
+
+  exe 'highlight filename_group ctermfg=' . l:fuzzy_file_color
+  exe 'highlight pattern_group ctermfg=' . l:fuzzy_pattern_color
+  match filename_group /^.*:\d\+:/
+  call matchadd("pattern_group", a:pattern[1:-2]) " remove shellescape from pattern
+
+  let l:cur_buf = bufnr('%')
+  call setline(1, a:input)
+  exe "res " . l:fuzzy_menu_height
+  redraw
+  echo a:prompt
+
+  while 1
+    try
+      let ch = getchar()
+    catch /^Vim:Interrupt$/ " CTRL-C
+      return s:CloseBuffer(l:cur_buf)
+    endtry
+
+    if ch ==# 0x1B " ESC
+      return s:CloseBuffer(l:cur_buf)
+    elseif ch ==# 0x0D " Enter
+      let l:result = getline('.')
+      call s:CloseBuffer(l:cur_buf)
+      return l:result
+    elseif ch ==# 0x6B " k
+      norm k
+    elseif ch ==# 0x6A " j
+      norm j
+    elseif ch == "\<Up>"
+      norm k
+    elseif ch == "\<Down>"
+      norm j
+    elseif ch == "\<PageUp>"
+      for i in range(1, l:fuzzy_menu_height)
+        norm k
+      endfor
+    elseif ch == "\<PageDown>"
+      for i in range(1, l:fuzzy_menu_height)
+        norm j
+      endfor
+    endif
+
+    redraw
+  endwhile
+endfunction
+
+
+" format of str is <file>:<line number>:...
+function s:ParseFileAndLineNo(str)
+  let l:splitted_line = split(a:str, ":")
+  let l:filename = l:splitted_line[0]
+  let l:full_filename = fnamemodify(l:filename, ':p')
+  let l:line_no = l:splitted_line[1]
+  return [l:full_filename, l:line_no]
+endfunction
+
+
+" main function - do a fuzzy search
+function FuzzySearch(flags, pattern, cur_file_only)
+  " settings
+  let l:grep_cmd = get(g:, 'grep_cmd', 'grep')
+  let l:grep_exclude_files = get(g:, 'grep_exclude_files', '')
+
+  " prepare the command
+  let l:chars = split(a:pattern, '\zs')
+  let l:regex = join(l:chars, ".*")
+  let l:pattern = shellescape(l:regex)
+  let l:cmd = l:grep_cmd . " -ni " . a:flags  . " " . l:pattern
+  if a:cur_file_only
+    let l:cur_file = @%
+    let l:cmd = l:cmd . " " . l:cur_file
+  else
+    let l:cmd = l:cmd . " * 2>/dev/null"
+  endif
+
+  let l:options = systemlist(l:cmd)
+
+  " filter files
+  if !empty(l:grep_exclude_files)
+    let l:filtered_options = []
+    for i in range(0, len(l:options) - 1)
+      let l:filename = split(l:options[i], ":")[0]
+      let result = matchstr(l:filename, l:grep_exclude_files)
+      if empty(result)
+        call add(l:filtered_options, l:options[i])
+      endif
+    endfor
+    let l:options = l:filtered_options
+  endif
+
+  if len(l:options) == 0
+    echo "No match found"
+    return
+  endif
+
+  " user selection
+  let l:selected_line = ""
+  let l:prompt = l:cmd . " (" . len(l:options) . " matches)"
+  let l:selected_line = s:InteractiveMenu(l:options, l:prompt, l:pattern)
+  if empty(l:selected_line)
+    return
+  endif
+
+  " process selection
+  let l:splitted_line = split(l:selected_line, ":")
+  if a:cur_file_only
+      let l:filename = l:cur_file
+      let l:line_no = l:splitted_line[0]
+  else
+      let l:filename = l:splitted_line[0]
+      let l:line_no = l:splitted_line[1]
+  endif
+
+  " store previous location to allow jumping back
+  call add(s:prev_locations, [line("."), expand('%:p')])
+
+  " jump to selection
+  execute 'edit +' . l:line_no l:filename
+endfunction
+
+
+" Jump back to previous location
+function FuzzyBack()
+  if empty(s:prev_locations)
+    echo "No previous location"
+    return
+  endif
+
+  let l:prev_loc = remove(s:prev_locations, -1)
+  execute 'edit +' . l:prev_loc[0] l:prev_loc[1]
+endfunction
+
+
+let &cpo = s:save_cpo
+unlet s:save_cpo
