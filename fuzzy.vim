@@ -91,6 +91,13 @@ function s:ParseFileAndLineNo(str)
 endfunction
 
 
+function Regex(pattern)
+  let l:chars = split(a:pattern, '\zs')
+  let l:regex = join(l:chars, ".*")
+  return l:regex
+endfunction
+
+
 " main function - do a fuzzy search
 function FuzzySearchMenu(flags, pattern, cur_file_only)
   " settings
@@ -98,8 +105,7 @@ function FuzzySearchMenu(flags, pattern, cur_file_only)
   let l:grep_exclude_files = get(g:, 'grep_exclude_files', '')
 
   " prepare the command
-  let l:chars = split(a:pattern, '\zs')
-  let l:regex = join(l:chars, ".*")
+  let l:regex = Regex(a:pattern)
   let l:pattern = shellescape(l:regex)
   let l:cmd = l:grep_cmd . " -ni " . a:flags  . " " . l:pattern
   if a:cur_file_only
@@ -169,8 +175,7 @@ endfunction
 
 " regular (non-interactive) fuzzy search
 function FuzzySearch(pattern)
-  let l:chars = split(a:pattern, '\zs')
-  let l:regex = join(l:chars, ".*")
+  let l:regex = Regex(a:pattern)
   let l:cmd = "/\\c" . l:regex . "\<CR>"
   call feedkeys(l:cmd)
 endfunction
