@@ -24,11 +24,10 @@ perform a fuzzy search of *pattern* in the current file.
 The search is case-insensitive.
 
 - `FuzzySearchMenu(flags, pattern, cur_file_only)` -
-perform an interactive fuzzy search (case-insensitive),
+perform an menu-based fuzzy search (case-insensitive),
 where `flags` is optional grep flags (can be empty string),
 `pattern` is the pattern to search for
 and `cur_file_only` is whether to search in current file only or not (set to `1`/`0` accordingly).
-All matches will be presented in a selection menu.
 Use the following keys to interact with the menu:
 `j`, `k`, `Down`, `Up`, `PageDown`, `PageUp`, `Enter`, `Esc`, `Ctrl-C`.
 
