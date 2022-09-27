@@ -101,8 +101,8 @@ endfunction
 " main function - do a fuzzy search
 function FuzzySearchMenu(flags, pattern, cur_file_only)
   " settings
-  let l:grep_cmd = get(g:, 'grep_cmd', 'grep')
-  let l:grep_exclude_files = get(g:, 'grep_exclude_files', '')
+  let l:grep_cmd = get(g:, 'fuzzy_grep_cmd', 'grep')
+  let l:exclude_files = get(g:, 'fuzzy_exclude_files', '')
 
   " prepare the command
   let l:regex = Regex(a:pattern)
@@ -118,11 +118,11 @@ function FuzzySearchMenu(flags, pattern, cur_file_only)
   let l:options = systemlist(l:cmd)
 
   " filter files
-  if !empty(l:grep_exclude_files)
+  if !empty(l:exclude_files)
     let l:filtered_options = []
     for i in range(0, len(l:options) - 1)
       let l:filename = split(l:options[i], ":")[0]
-      let result = matchstr(l:filename, l:grep_exclude_files)
+      let result = matchstr(l:filename, l:exclude_files)
       if empty(result)
         call add(l:filtered_options, l:options[i])
       endif
