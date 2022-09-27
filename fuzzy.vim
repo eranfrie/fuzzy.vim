@@ -18,10 +18,10 @@ let s:prev_locations = []
 
 
 function s:CloseBuffer(bufnr)
-   wincmd p
-   execute "bwipe" a:bufnr
-   redraw
-   return ""
+  wincmd p
+  execute "bwipe" a:bufnr
+  redraw
+  return ""
 endfunction
 
 
@@ -145,12 +145,13 @@ function FuzzySearchMenu(flags, pattern, cur_file_only)
 
   " process selection
   let l:splitted_line = split(l:selected_line, ":")
-  if a:cur_file_only
-      let l:filename = l:cur_file
-      let l:line_no = l:splitted_line[0]
+  " if we grep in current file only, some grepping tools omit the file name
+  if a:cur_file_only && l:splitted_line[0] !=# l:cur_file
+    let l:filename = l:cur_file
+    let l:line_no = l:splitted_line[0]
   else
-      let l:filename = l:splitted_line[0]
-      let l:line_no = l:splitted_line[1]
+    let l:filename = l:splitted_line[0]
+    let l:line_no = l:splitted_line[1]
   endif
 
   " store previous location to allow jumping back
