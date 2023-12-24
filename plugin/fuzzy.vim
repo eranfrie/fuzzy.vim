@@ -63,25 +63,31 @@ function s:Grep(flags, pattern, cur_file_only) abort
 endfunction
 
 
-function s:InteractiveMenu(input, prompt, pattern) abort
-  bo new +setlocal\ buftype=nofile\ bufhidden=wipe\ nofoldenable\
-    \ colorcolumn=0\ nobuflisted\ number\ norelativenumber\ noswapfile\ wrap\ cursorline
-
+function s:InteractiveMenu(flags, pattern, cur_file_only) abort
   " settings
   let l:fuzzy_menu_height = get(g:, 'fuzzy_menu_height', 15)
   let l:fuzzy_file_color = get(g:, 'fuzzy_file_color', "blue")
   let l:fuzzy_pattern_color = get(g:, 'fuzzy_pattern_color', "red")
 
+  " get grep result
+  let l:res = s:Grep(a:flags, a:pattern, a:cur_file_only)
+  let l:options = l:res[0]
+  let l:prompt = l:res[1]
+  let l:pattern = l:res[2]
+
+  bo new +setlocal\ buftype=nofile\ bufhidden=wipe\ nofoldenable\
+    \ colorcolumn=0\ nobuflisted\ number\ norelativenumber\ noswapfile\ wrap\ cursorline
+
   exe 'highlight filename_group ctermfg=' . l:fuzzy_file_color
   exe 'highlight pattern_group ctermfg=' . l:fuzzy_pattern_color
   match filename_group /^.*:\d\+:/
-  call matchadd("pattern_group", a:pattern[1:-2]) " remove shellescape from pattern
+  call matchadd("pattern_group", l:pattern[1:-2]) " remove shellescape from pattern
 
   let l:cur_buf = bufnr('%')
-  call setline(1, a:input)
+  call setline(1, l:options)
   exe "res " . l:fuzzy_menu_height
   redraw
-  echo a:prompt
+  echo l:prompt
 
   while 1
     try
@@ -138,13 +144,8 @@ endfunction
 
 " main function - do a fuzzy search
 function FuzzySearchMenu(flags, pattern, cur_file_only) abort
-  let l:res = s:Grep(a:flags, a:pattern, a:cur_file_only)
-  let l:options = l:res[0]
-  let l:prompt = l:res[1]
-  let l:pattern = l:res[2]
-
-  " user selection
-  let l:selected_line = s:InteractiveMenu(l:options, l:prompt, l:pattern)
+  " get user selection
+  let l:selected_line = s:InteractiveMenu(a:flags, a:pattern, a:cur_file_only)
   if empty(l:selected_line)
     return
   endif
