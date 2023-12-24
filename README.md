@@ -60,11 +60,6 @@ let g:fuzzy_menu_height = 15
 let g:fuzzy_file_color = "blue"
 ```
 
-- Set the color of the matched pattern in the results in the selection menu
-```
-let g:fuzzy_pattern_color = "red"
-```
-
 - Disable loading the plugin
 ```
 let g:loaded_fuzzy = 1
