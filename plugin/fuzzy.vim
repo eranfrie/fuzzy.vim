@@ -30,6 +30,8 @@ function s:Grep(flags, pattern, cur_file_only) abort
   let l:grep_cmd = get(g:, 'fuzzy_grep_cmd', 'grep')
   let l:exclude_files = get(g:, 'fuzzy_exclude_files', '')
 
+  let l:raw_pattern = a:pattern
+
   " prepare the command
   let l:regex = Regex(a:pattern)
   let l:pattern = shellescape(l:regex)
@@ -56,7 +58,7 @@ function s:Grep(flags, pattern, cur_file_only) abort
     let l:options = l:filtered_options
   endif
 
-  let l:prompt = l:cmd . " (" . len(l:options) . " matches)"
+  let l:prompt = "Cmd: '" . l:cmd . "'. Pattern: " . l:raw_pattern . " (" . len(l:options) . " matches)"
   return [l:options, l:prompt, l:pattern]
 endfunction
 
@@ -118,7 +120,7 @@ endfunction
 
 
 " format of str is <file>:<line number>:...
-function s:ParseFileAndLineNo(str)
+function s:ParseFileAndLineNo(str) abort
   let l:splitted_line = split(a:str, ":")
   let l:filename = l:splitted_line[0]
   let l:full_filename = fnamemodify(l:filename, ':p')
@@ -127,7 +129,7 @@ function s:ParseFileAndLineNo(str)
 endfunction
 
 
-function Regex(pattern)
+function Regex(pattern) abort
   let l:chars = split(a:pattern, '\zs')
   let l:regex = join(l:chars, ".*")
   return l:regex
@@ -135,7 +137,7 @@ endfunction
 
 
 " main function - do a fuzzy search
-function FuzzySearchMenu(flags, pattern, cur_file_only)
+function FuzzySearchMenu(flags, pattern, cur_file_only) abort
   let l:res = s:Grep(a:flags, a:pattern, a:cur_file_only)
   let l:options = l:res[0]
   let l:prompt = l:res[1]
