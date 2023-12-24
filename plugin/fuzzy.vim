@@ -25,6 +25,42 @@ function s:CloseBuffer(bufnr)
 endfunction
 
 
+function s:Grep(flags, pattern, cur_file_only) abort
+  " settings
+  let l:grep_cmd = get(g:, 'fuzzy_grep_cmd', 'grep')
+  let l:exclude_files = get(g:, 'fuzzy_exclude_files', '')
+
+  " prepare the command
+  let l:regex = Regex(a:pattern)
+  let l:pattern = shellescape(l:regex)
+  let l:cmd = l:grep_cmd . " -ni " . a:flags  . " " . l:pattern
+  if a:cur_file_only
+    let l:cur_file = @%
+    let l:cmd = l:cmd . " " . l:cur_file
+  else
+    let l:cmd = l:cmd . " * 2>/dev/null"
+  endif
+
+  let l:options = systemlist(l:cmd)
+
+  " filter files
+  if !empty(l:exclude_files)
+    let l:filtered_options = []
+    for i in range(0, len(l:options) - 1)
+      let l:filename = split(l:options[i], ":")[0]
+      let result = matchstr(l:filename, l:exclude_files)
+      if empty(result)
+        call add(l:filtered_options, l:options[i])
+      endif
+    endfor
+    let l:options = l:filtered_options
+  endif
+
+  let l:prompt = l:cmd . " (" . len(l:options) . " matches)"
+  return [l:options, l:prompt, l:pattern]
+endfunction
+
+
 function s:InteractiveMenu(input, prompt, pattern) abort
   bo new +setlocal\ buftype=nofile\ bufhidden=wipe\ nofoldenable\
     \ colorcolumn=0\ nobuflisted\ number\ norelativenumber\ noswapfile\ wrap\ cursorline
@@ -100,44 +136,12 @@ endfunction
 
 " main function - do a fuzzy search
 function FuzzySearchMenu(flags, pattern, cur_file_only)
-  " settings
-  let l:grep_cmd = get(g:, 'fuzzy_grep_cmd', 'grep')
-  let l:exclude_files = get(g:, 'fuzzy_exclude_files', '')
-
-  " prepare the command
-  let l:regex = Regex(a:pattern)
-  let l:pattern = shellescape(l:regex)
-  let l:cmd = l:grep_cmd . " -ni " . a:flags  . " " . l:pattern
-  if a:cur_file_only
-    let l:cur_file = @%
-    let l:cmd = l:cmd . " " . l:cur_file
-  else
-    let l:cmd = l:cmd . " * 2>/dev/null"
-  endif
-
-  let l:options = systemlist(l:cmd)
-
-  " filter files
-  if !empty(l:exclude_files)
-    let l:filtered_options = []
-    for i in range(0, len(l:options) - 1)
-      let l:filename = split(l:options[i], ":")[0]
-      let result = matchstr(l:filename, l:exclude_files)
-      if empty(result)
-        call add(l:filtered_options, l:options[i])
-      endif
-    endfor
-    let l:options = l:filtered_options
-  endif
-
-  if len(l:options) == 0
-    echo "No match found"
-    return
-  endif
+  let l:res = s:Grep(a:flags, a:pattern, a:cur_file_only)
+  let l:options = l:res[0]
+  let l:prompt = l:res[1]
+  let l:pattern = l:res[2]
 
   " user selection
-  let l:selected_line = ""
-  let l:prompt = l:cmd . " (" . len(l:options) . " matches)"
   let l:selected_line = s:InteractiveMenu(l:options, l:prompt, l:pattern)
   if empty(l:selected_line)
     return
