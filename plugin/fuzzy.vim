@@ -1,5 +1,5 @@
 " Vim global plugin for fuzzy search
-" Last Change:  2023 Jun 13
+" Last Change:  2023 Dec 24
 " Maintainer:   Eran Friedman
 " License:      This file is placed in the public domain.
 
@@ -21,11 +21,10 @@ function s:CloseBuffer(bufnr)
   wincmd p
   execute "bwipe" a:bufnr
   redraw
-  return ""
 endfunction
 
 
-function s:Grep(flags, pattern, cur_file_only) abort
+function s:Grep(flags, pattern, cur_file) abort
   " settings
   let l:grep_cmd = get(g:, 'fuzzy_grep_cmd', 'grep')
   let l:exclude_files = get(g:, 'fuzzy_exclude_files', '')
@@ -36,9 +35,8 @@ function s:Grep(flags, pattern, cur_file_only) abort
   let l:regex = Regex(a:pattern)
   let l:pattern = shellescape(l:regex)
   let l:cmd = l:grep_cmd . " -ni " . a:flags  . " " . l:pattern
-  if a:cur_file_only
-    let l:cur_file = @%
-    let l:cmd = l:cmd . " " . l:cur_file
+  if a:cur_file != v:null
+    let l:cmd = l:cmd . " " . a:cur_file
   else
     let l:cmd = l:cmd . " * 2>/dev/null"
   endif
@@ -58,26 +56,34 @@ function s:Grep(flags, pattern, cur_file_only) abort
     let l:options = l:filtered_options
   endif
 
-  let l:prompt = "Cmd: '" . l:cmd . "'. Pattern: " . l:raw_pattern . " (" . len(l:options) . " matches)"
+  let l:prompt = 'Cmd: "' . l:cmd . '". Pattern: ' . l:raw_pattern . ' (' . len(l:options) . ' matches)'
   return [l:options, l:prompt]
 endfunction
 
 
 function s:InteractiveMenu(flags, pattern, cur_file_only) abort
+  let l:pattern = a:pattern
+
   " settings
   let l:fuzzy_menu_height = get(g:, 'fuzzy_menu_height', 15)
   let l:fuzzy_file_color = get(g:, 'fuzzy_file_color', "blue")
 
-  " get grep result
-  let l:res = s:Grep(a:flags, a:pattern, a:cur_file_only)
-  let l:options = l:res[0]
-  let l:prompt = l:res[1]
+  " get current file before creating the menu buffer
+  let l:cur_file = v:null
+  if a:cur_file_only
+    let l:cur_file = @%
+  endif
 
   bo new +setlocal\ buftype=nofile\ bufhidden=wipe\ nofoldenable\
     \ colorcolumn=0\ nobuflisted\ number\ norelativenumber\ noswapfile\ wrap\ cursorline
 
   exe 'highlight filename_group ctermfg=' . l:fuzzy_file_color
   match filename_group /^.*:\d\+:/
+
+  " get grep result
+  let l:res = s:Grep(a:flags, l:pattern, l:cur_file)
+  let l:options = l:res[0]
+  let l:prompt = l:res[1]
 
   let l:cur_buf = bufnr('%')
   call setline(1, l:options)
@@ -89,19 +95,17 @@ function s:InteractiveMenu(flags, pattern, cur_file_only) abort
     try
       let ch = getchar()
     catch /^Vim:Interrupt$/ " CTRL-C
-      return s:CloseBuffer(l:cur_buf)
+      call s:CloseBuffer(l:cur_buf)
+      return ""
     endtry
 
     if ch ==# 0x1B " ESC
-      return s:CloseBuffer(l:cur_buf)
-    elseif ch ==# 0x0D " Enter
-      let l:result = getline('.')
       call s:CloseBuffer(l:cur_buf)
-      return l:result
-    elseif ch ==# 0x6B " k
-      norm k
-    elseif ch ==# 0x6A " j
-      norm j
+      return ""
+    elseif ch ==# 0x0D " Enter
+      let l:selected_line = getline('.')
+      call s:CloseBuffer(l:cur_buf)
+      return l:selected_line
     elseif ch == "\<Up>"
       norm k
     elseif ch == "\<Down>"
@@ -114,9 +118,38 @@ function s:InteractiveMenu(flags, pattern, cur_file_only) abort
       for i in range(1, l:fuzzy_menu_height)
         norm j
       endfor
+    " update pattern
+    else
+      " Backspace
+      if ch is# "\<BS>"
+        if len(l:pattern) > 0
+          let l:pattern = l:pattern[:-2]
+        endif
+      " concatenate a character
+      else
+        let l:pattern = l:pattern . nr2char(ch)
+      endif
+
+      let l:res = s:Grep(a:flags, l:pattern, l:cur_file)
+      " remove all lines in case there are less options than before
+      let l:lines_to_remove = len(l:options)
+      while l:lines_to_remove > 0
+        d
+        let l:lines_to_remove -=1
+      endwhile
+
+      let l:options = l:res[0]
+      let l:prompt = l:res[1]
+
+      let l:cur_buf = bufnr('%')
+      call setline(1, l:options)
+
+      exe "res " . l:fuzzy_menu_height
     endif
 
     redraw
+    echo l:prompt
+
   endwhile
 endfunction
 
@@ -140,6 +173,8 @@ endfunction
 
 " main function - do a fuzzy search
 function FuzzySearchMenu(flags, pattern, cur_file_only) abort
+  let l:cur_file = @%
+
   " get user selection
   let l:selected_line = s:InteractiveMenu(a:flags, a:pattern, a:cur_file_only)
   if empty(l:selected_line)
